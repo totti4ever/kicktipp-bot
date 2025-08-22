@@ -4,10 +4,12 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from ..utils.selenium_utils import SeleniumUtils
+from ..utils.odds_api import OddsApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -148,11 +150,16 @@ class TableRowProcessor:
 
 
 class GameDataExtractor:
-    """Handles extraction of game-specific data from table rows."""
+    """Handles extraction of game-specific data from table rows and API."""
+
+    odds_api_client: Optional[OddsApiClient] = None
+
+    @staticmethod
+    def set_odds_api_client(client: OddsApiClient):
+        GameDataExtractor.odds_api_client = client
 
     @staticmethod
     def extract_team_name(data_row, column_index: int, team_type: str) -> Optional[str]:
-        """Extract team name from a specific column."""
         team_element = SeleniumUtils.safe_find_element(
             data_row, By.XPATH, f'./td[{column_index}]')
         if team_element:
@@ -164,7 +171,6 @@ class GameDataExtractor:
 
     @staticmethod
     def get_tip_fields(game_row) -> Optional[tuple]:
-        """Get tip input fields directly from a game row element."""
         home_tip_field = SeleniumUtils.safe_find_element(
             game_row, By.XPATH, './/input[contains(@name, "heimTipp")]')
         away_tip_field = SeleniumUtils.safe_find_element(
@@ -184,32 +190,37 @@ class GameDataExtractor:
             return None
 
     @staticmethod
-    def extract_quotes(game_row) -> Optional[list]:
-        """Extract betting quotes directly from a game row element."""
-        quotes_element = SeleniumUtils.safe_find_element(
-            game_row, By.XPATH, './/a[contains(@class, "quote-link")]')
-        if not quotes_element:
-            logger.warning("Could not find quotes element")
+    def extract_api_odds(home_team: str, away_team: str, match_time: datetime) -> Optional[dict]:
+        if not GameDataExtractor.odds_api_client:
+            logger.warning("OddsApiClient not set!")
             return None
-
-        quotes_raw = SeleniumUtils.safe_get_text(
-            quotes_element, 'quotes element')
-        if not quotes_raw:
-            logger.warning("Could not extract quotes content")
+        event = GameDataExtractor.odds_api_client.get_odds_for_match(home_team, away_team, match_time)
+        if not event:
+            logger.info(f"No odds found for {home_team} vs {away_team} at {match_time}")
             return None
+        return {
+            'h2h': GameDataExtractor.odds_api_client.get_h2h_quotes(event),
+            'spreads': GameDataExtractor.odds_api_client.get_spreads(event),
+            'totals': GameDataExtractor.odds_api_client.get_totals(event),
+        }
 
-        quotes_text = quotes_raw.replace("Quote: ", "").strip()
+    @staticmethod
+    def extract_quotes_api(home_team: str, away_team: str, match_time: datetime) -> Optional[dict]:
+        odds = GameDataExtractor.extract_api_odds(home_team, away_team, match_time)
+        if odds and odds['h2h']:
+            return odds['h2h']
+        return None
 
-        if " / " in quotes_text:
-            quotes = quotes_text.split(" / ")
-        elif " | " in quotes_text:
-            quotes = quotes_text.split(" | ")
-        else:
-            logger.warning(f"Could not parse quotes format: {quotes_text}")
-            return None
+    @staticmethod
+    def extract_spreads_api(home_team: str, away_team: str, match_time: datetime) -> Optional[dict]:
+        odds = GameDataExtractor.extract_api_odds(home_team, away_team, match_time)
+        if odds and odds['spreads']:
+            return odds['spreads']
+        return None
 
-        if len(quotes) != 3:
-            logger.warning(f"Expected 3 quotes, got {len(quotes)}: {quotes}")
-            return None
-
-        return quotes
+    @staticmethod
+    def extract_totals_api(home_team: str, away_team: str, match_time: datetime) -> Optional[dict]:
+        odds = GameDataExtractor.extract_api_odds(home_team, away_team, match_time)
+        if odds and odds['totals']:
+            return odds['totals']
+        return None

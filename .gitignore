@@ -11,3 +11,15 @@ my-secrets.yaml
 
 # Chromedriver (if it is stored in the project)
 chromedriver
+ 
+# tmp docker mount
+/docker/tmp/
+/src/kicktipp_bot/data/
+
+# python venv
+/.venv/
+
+# pyCache
+__pycache__/
+
+/.vscode/

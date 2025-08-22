@@ -6,6 +6,14 @@ from typing import Optional
 
 
 class Config:
+    # Wenn true, werden used_odds geschrieben und Datei ggf. neu angelegt
+    USED_ODDS_WRITE: bool = os.getenv("USED_ODDS_WRITE", "false").lower() == "true"
+    # Wenn true, wird immer die vorhandene odds_cache.json verwendet (egal wie alt)
+    ODDS_CACHE_ALWAYS_USE_FILE: bool = os.getenv("ODDS_CACHE_ALWAYS_USE_FILE", "false").lower() == "true"
+    # Tipps überschreiben erlauben
+    OVERWRITE_TIPS: bool = os.getenv("OVERWRITE_TIPS", "false").lower() == "true"
+    # Odds-Strategie: 'classic' (nur H2H) oder 'smart' (H2H+Spread+Totals)
+    ODDS_STRATEGY: str = os.getenv("ODDS_STRATEGY", "classic")
     """Configuration class containing all environment variables and constants."""
 
     # Base URLs
@@ -36,6 +44,10 @@ class Config:
     NTFY_USERNAME: Optional[str] = os.getenv("NTFY_USERNAME")
     NTFY_PASSWORD: Optional[str] = os.getenv("NTFY_PASSWORD")
     WEBHOOK_URL: Optional[str] = os.getenv("WEBHOOK_URL")
+
+    # Odds API Konfiguration
+    USE_ODDS_API: bool = os.getenv("USE_ODDS_API", "false").lower() == "true"
+    ODDS_API_KEY: str = os.getenv("ODDS_API_KEY", "")
 
     @classmethod
     def validate_required_config(cls) -> bool:

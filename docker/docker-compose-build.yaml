@@ -9,13 +9,16 @@ x-common:
 services:
   kicktipp-bot:
     container_name: kicktipp-bot
+    command: ["python", "run.py", "--headless", "--debug"]
     <<: *common-settings
     platform: linux/amd64
     # tty: true
-    restart: unless-stopped
+    restart: no
     env_file: ../.env
-    ports:
-      - "8080:8080"  # Health check port
+    volumes:
+      - ./tmp/data:/app/src/data
+    # ports:
+    #   - "8080:8080"  # Health check port
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s

@@ -16,6 +16,7 @@ from ..models.game import Game
 from .notifications import NotificationManager
 from ..utils.selenium_utils import SeleniumUtils
 from .table_processors import TimeExtractor, TableRowProcessor, GameDataExtractor
+from ..utils.odds_api import KICKTIPP_TO_API
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,8 @@ class GameTipper:
             # Submit all tips (button should always be clickable)
             self._submit_all_tips()
 
-            # Debug mode sleep
-            if self._is_debug_mode():
+            # Debug mode sleep nur wenn RUN_EVERY_X_MINUTES > 0
+            if self._is_debug_mode() and Config.RUN_EVERY_X_MINUTES > 0:
                 logger.info(
                     "Local debug mode - sleeping for 20 seconds to review results")
                 sleep(20)
@@ -206,41 +207,77 @@ class GameTipper:
             logger.info(
                 f"Processing: {home_team} vs {away_team} | Time: {game_time.strftime('%d.%m.%y %H:%M')}")
 
+
+            # Prüfe, ob das Spiel bereits begonnen hat
+            if game_time < datetime.now():
+                logger.info(f"Game {game_number} already started ({game_time}), skipping.")
+                return False
+
             # Get tip fields using the new extractor
             tip_fields = GameDataExtractor.get_tip_fields(data_row)
             if not tip_fields:
-                logger.debug(
-                    f"Game {game_number} cannot be tipped (likely finished)")
+                logger.debug(f"Game {game_number} cannot be tipped (likely finished)")
                 return False
 
             home_tip_field, away_tip_field = tip_fields
 
             # Check if already tipped
-            if self._is_already_tipped(home_tip_field, away_tip_field):
-                home_val = SeleniumUtils.safe_get_attribute(
-                    home_tip_field, 'value', 'home tip field') or ''
-                away_val = SeleniumUtils.safe_get_attribute(
-                    away_tip_field, 'value', 'away tip field') or ''
-                logger.info(f"Game already tipped: {home_val} - {away_val}")
-                return False
+            already_tipped = self._is_already_tipped(home_tip_field, away_tip_field)
+            home_val = SeleniumUtils.safe_get_attribute(
+                home_tip_field, 'value', 'home tip field') or ''
+            away_val = SeleniumUtils.safe_get_attribute(
+                away_tip_field, 'value', 'away tip field') or ''
+            if already_tipped:
+                if Config.OVERWRITE_TIPS:
+                    if self._is_debug_mode():
+                        logger.info(f"Overwriting existing tip: {home_val} - {away_val}")
+                    # Tipp wird überschrieben
+                else:
+                    logger.info(f"Game already tipped: {home_val} - {away_val}")
+                    return False
 
             # Check timing constraints
             if not self._should_tip_game(game_time):
                 return False
 
-            # Extract quotes using the new extractor
-            quotes = GameDataExtractor.extract_quotes(data_row)
-            if not quotes:
-                logger.warning(
-                    f"Could not extract quotes for game {game_number}")
-                return False
 
-            logger.debug(f"Quotes: {quotes}")
+            # Quoten aus API oder klassisch extrahieren
+            if Config.USE_ODDS_API and GameDataExtractor.odds_api_client:
+                quotes_dict = GameDataExtractor.extract_quotes_api(home_team, away_team, game_time)
+                if not quotes_dict:
+                    logger.warning(f"Could not extract API quotes for game {game_number}")
+                    # Eventdaten loggen
+                    event = GameDataExtractor.odds_api_client.get_odds_for_match(home_team, away_team, game_time)
+                    logger.warning(f"Eventdaten: {event}")
+                    return False
+                # Teamnamen für API holen
+                api_home = KICKTIPP_TO_API.get(home_team, home_team)
+                api_away = KICKTIPP_TO_API.get(away_team, away_team)
+                quotes = [
+                    quotes_dict.get(api_home, ''),
+                    quotes_dict.get('Draw', ''),
+                    quotes_dict.get(api_away, '')
+                ]
+                if not all(quotes):
+                    event = GameDataExtractor.odds_api_client.get_odds_for_match(home_team, away_team, game_time)
+                    logger.error(f"Invalid quote values: {quotes} | Eventdaten: {event}")
+                    raise ValueError(f"Invalid quote values: {quotes}")
+            else:
+                quotes = GameDataExtractor.extract_quotes(data_row)
+                if not quotes:
+                    logger.warning(f"Could not extract quotes for game {game_number}")
+                    return False
+                logger.debug(f"Quotes: {quotes}")
 
             # Create game and calculate tip
-            game = Game(home_team, away_team, quotes, game_time)
+            # odds_event und odds_api_client für smarte Logik übergeben
+            odds_event = None
+            odds_api_client = None
+            if Config.USE_ODDS_API and GameDataExtractor.odds_api_client:
+                odds_event = GameDataExtractor.odds_api_client.get_odds_for_match(home_team, away_team, game_time)
+                odds_api_client = GameDataExtractor.odds_api_client
+            game = Game(home_team, away_team, quotes, game_time, odds_event=odds_event, odds_api_client=odds_api_client)
             tip = game.calculate_tip()
-            logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications
             if self._enter_tip(home_tip_field, away_tip_field, tip):

@@ -49,6 +49,8 @@ class SeleniumUtils:
         """
         for attempt in range(retry_count):
             try:
+                #TODO: FIXME
+                timeout=1
                 wait = WebDriverWait(driver, timeout)
                 element = wait.until(
                     EC.presence_of_element_located((by, value)))

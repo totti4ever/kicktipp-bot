@@ -1,9 +1,17 @@
+
 """
 Kicktipp Bot - Automated football betting tips based on odds analysis.
 
 This script automatically logs into Kicktipp, analyzes betting odds for upcoming games,
 calculates optimal tips, and submits them while sending notifications.
 """
+
+# .env laden
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import logging
 import sys
@@ -18,6 +26,8 @@ from .core.authentication import Authenticator, AuthenticationError
 from .core.game_tipper import GameTipper, GameTippingError
 from .core.notifications import NotificationManager
 from .health import health_status, health_monitor
+from .utils.odds_api import OddsApiClient
+from .core.table_processors import GameDataExtractor
 
 
 def setup_logging(debug_mode: bool = False) -> None:
@@ -107,22 +117,30 @@ class KicktippBot:
 
 def run_bot() -> None:
     """Run a single bot execution cycle."""
+    # Odds API initialisieren, falls aktiviert
+    if Config.USE_ODDS_API and Config.ODDS_API_KEY:
+        odds_client = OddsApiClient(Config.ODDS_API_KEY)
+        GameDataExtractor.set_odds_api_client(odds_client)
+        logger.info("OddsApiClient initialisiert und im GameDataExtractor gesetzt.")
+    else:
+        logger.info("OddsApiClient nicht aktiviert (USE_ODDS_API ist False oder kein API Key gesetzt).")
     bot = KicktippBot()
     bot.run()
 
 
 def main() -> None:
     """Main entry point for the Kicktipp bot."""
+
     # Check for debug mode
     debug_mode = len(sys.argv) > 1 and '--debug' in sys.argv
-    if debug_mode:
-        logger.info("Debug mode enabled - detailed logging active")
 
     # Setup logging with appropriate level
     setup_logging(debug_mode)
 
     # Get logger after setup
     logger = logging.getLogger(__name__)
+    if debug_mode:
+        logger.info("Debug mode enabled - detailed logging active")
 
     # Validate configuration
     if not Config.validate_required_config():
@@ -151,6 +169,7 @@ def main() -> None:
     health_status.heartbeat()
 
     try:
+        first_run = True
         while True:
             try:
                 current_time = datetime.now().strftime('%d.%m.%y %H:%M')
@@ -173,10 +192,11 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Error during tipping cycle: {e}", exc_info=True)
 
-            # Sleep until next cycle
             sleep_minutes = Config.RUN_EVERY_X_MINUTES
-            logger.info(
-                f"Sleeping for {sleep_minutes} minutes until next cycle...")
+            if sleep_minutes == 0:
+                logger.info("RUN_EVERY_X_MINUTES is 0. Exiting after one cycle.")
+                break
+            logger.info(f"Sleeping for {sleep_minutes} minutes until next cycle...")
             sleep(sleep_minutes * 60)
 
     except KeyboardInterrupt:

@@ -1,9 +1,17 @@
+
 #!/usr/bin/env python3
 """
 Entry point for the Kicktipp Bot.
 
 This script can be run directly from the root directory to start the bot.
 """
+
+# .env laden, bevor irgendetwas anderes importiert wird
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import sys
 import os
