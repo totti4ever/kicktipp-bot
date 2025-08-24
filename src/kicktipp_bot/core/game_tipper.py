@@ -16,6 +16,7 @@ from ..models.game import Game
 from .notifications import NotificationManager
 from ..utils.selenium_utils import SeleniumUtils
 from .table_processors import TimeExtractor, TableRowProcessor, GameDataExtractor
+from .quote_extractor_kicktipp import QuoteExtractorKicktipp
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,7 @@ class GameTipper:
                 return False
 
             # Extract quotes using the new extractor
-            quotes = GameDataExtractor.extract_quotes(data_row)
+            quotes = QuoteExtractorKicktipp.extract_quotes(data_row)
             if not quotes:
                 logger.warning(
                     f"Could not extract quotes for game {game_number}")

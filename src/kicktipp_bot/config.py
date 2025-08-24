@@ -37,6 +37,14 @@ class Config:
     NTFY_PASSWORD: Optional[str] = os.getenv("NTFY_PASSWORD")
     WEBHOOK_URL: Optional[str] = os.getenv("WEBHOOK_URL")
 
+    # Odds provider ("kicktipp.de" (default) or "the-odds-api.com")
+    ODDS_PROVIDER: str = os.getenv("ODDS_PROVIDER", "kicktipp.de")
+    # API Key für the-odds-api.com (Pflicht, wenn ODDS_PROVIDER='the-odds-api.com')
+    THE_ODDS_API_KEY: Optional[str] = os.getenv("THE_ODDS_API_KEY")
+    # Validierung für Odds-API-Key
+    if ODDS_PROVIDER == "the-odds-api.com" and not THE_ODDS_API_KEY:
+        raise ValueError("THE_ODDS_API_KEY muss gesetzt sein, wenn ODDS_PROVIDER='the-odds-api.com'!")
+
     @classmethod
     def validate_required_config(cls) -> bool:
         """Validate that all required configuration is present."""
