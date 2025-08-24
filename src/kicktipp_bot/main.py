@@ -175,9 +175,15 @@ def main() -> None:
 
             # Sleep until next cycle
             sleep_minutes = Config.RUN_EVERY_X_MINUTES
+            if sleep_minutes == 0:
+                logger.info("Repetition time is 0, shutting down")
+                return
+            next_run = datetime.now().timestamp() + sleep_minutes * 60
             logger.info(
-                f"Sleeping for {sleep_minutes} minutes until next cycle...")
-            sleep(sleep_minutes * 60)
+                f"Sleeping for {sleep_minutes} minutes until next cycle at {next_run}")
+            while (remaining := next_run - datetime.now().timestamp()) > 0:
+                sleep(min(10, remaining))
+
 
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
