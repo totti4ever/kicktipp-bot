@@ -2,49 +2,31 @@
 
 import random
 from datetime import datetime
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
+from .game_odds_dtos import GameOddsDTO
 
 
 class Game:
     """Represents a football game with teams, betting quotes, and tip calculation logic."""
 
-    def __init__(self, home_team: str, away_team: str, quotes: List[str], game_time: datetime):
+    def __init__(self, home_team: str, away_team: str, odds: GameOddsDTO, game_time: datetime, detailed_odds: Optional[List[GameOddsDTO]] = None):
         """
         Initialize a Game instance.
 
         Args:
             home_team: Name of the home team
             away_team: Name of the away team
-            quotes: List of betting quotes [home_win, draw, away_win]
+            odds: Aggregated odds (GameOddsDTO)
             game_time: DateTime when the game starts
+            detailed_odds: List of all available odds (optional)
         """
         self.home_team = home_team.strip()
         self.away_team = away_team.strip()
-        self.quotes = self._validate_quotes(quotes)
+        self.odds = odds
         self.game_time = game_time
+        self.detailed_odds = detailed_odds or []
 
-    def _validate_quotes(self, quotes: List[str]) -> List[float]:
-        """
-        Validate and convert quotes to float values.
-
-        Args:
-            quotes: List of quote strings
-
-        Returns:
-            List of float quotes
-
-        Raises:
-            ValueError: If quotes are invalid
-        """
-        if len(quotes) != 3:
-            raise ValueError(f"Expected 3 quotes, got {len(quotes)}")
-
-        try:
-            return [float(quote) for quote in quotes]
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid quote values: {quotes}") from e
-
-    def calculate_tip(self, home_quote: Union[float, None] = None, away_quote: Union[float, None] = None) -> Tuple[int, int]:
+    def calculate_tip(self) -> Tuple[int, int]:
         """
         Calculate betting tip based on the quotes.
 
@@ -55,10 +37,11 @@ class Game:
         Returns:
             Tuple of (home_goals, away_goals) prediction
         """
-        if home_quote is None:
-            home_quote = self.quotes[0]
-        if away_quote is None:
-            away_quote = self.quotes[2]
+        # Default: nutze h2h-odds
+        if home_quote is None and self.odds and self.odds.h2h:
+            home_quote = self.odds.h2h.winHomeOdd
+        if away_quote is None and self.odds and self.odds.h2h:
+            away_quote = self.odds.h2h.winAwayOdd
 
         # Calculate quote difference (negative = home team more likely to win)
         quote_difference = home_quote - away_quote
@@ -93,5 +76,5 @@ class Game:
 
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
-        return (f"Game(home_team='{self.home_team}', away_team='{self.away_team}', "
-                f"quotes={self.quotes}, game_time='{self.game_time}')")
+        return (f"Game(home='{self.home_team}', away='{self.away_team}', "
+                f"game_time='{self.game_time}', odds={self.odds}, detailed_odds={self.detailed_odds})")

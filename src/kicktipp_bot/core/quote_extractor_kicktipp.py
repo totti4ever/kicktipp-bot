@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from ..models.quote_dto import QuoteDTO
 from selenium.webdriver.common.by import By
 from ..utils.selenium_utils import SeleniumUtils
 
@@ -7,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 class QuoteExtractorKicktipp:
     @staticmethod
-    def extract_quotes(game_row) -> Optional[list]:
-        """Extract betting quotes directly from a game row element (kicktipp.de)."""
+    def extract_quotes(game_row) -> Optional[QuoteDTO]:
+        """Extract betting quotes directly from a game row element (kicktipp.de) and return as QuoteDTO."""
         quotes_element = SeleniumUtils.safe_find_element(
             game_row, By.XPATH, './/a[contains(@class, "quote-link")]')
         if not quotes_element:
@@ -35,4 +36,12 @@ class QuoteExtractorKicktipp:
             logger.warning(f"Expected 3 quotes, got {len(quotes)}: {quotes}")
             return None
 
-        return quotes
+        try:
+            home = float(quotes[0])
+            draw = float(quotes[1])
+            away = float(quotes[2])
+        except Exception as e:
+            logger.warning(f"Could not convert quotes to float: {quotes} ({e})")
+            return None
+
+        return QuoteDTO(home=home, draw=draw, away=away, raw_text=quotes_text)

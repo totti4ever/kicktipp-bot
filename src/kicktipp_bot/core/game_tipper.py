@@ -74,7 +74,8 @@ class GameTipper:
             self._process_all_table_rows()
 
             # Submit all tips (button should always be clickable)
-            self._submit_all_tips()
+            if self.processed_count > 0:
+                self._submit_all_tips()
 
             # Debug mode sleep
             if self._is_debug_mode() and Config.RUN_EVERY_X_MINUTES != 0:
@@ -237,14 +238,14 @@ class GameTipper:
             if not self._should_tip_game(game_time):
                 return False
 
-            # Extract quotes using the new extractor
+            # Extract quotes using the new extractor (returns QuoteDTO)
             quotes = QuoteExtractorKicktipp.extract_quotes(data_row)
             if not quotes:
                 logger.warning(
                     f"Could not extract quotes for game {game_number}")
                 return False
 
-            logger.debug(f"Quotes: {quotes}")
+            logger.debug(f"Quotes: home={quotes.home}, draw={quotes.draw}, away={quotes.away}, raw='{quotes.raw_text}'")
 
             # Create game and calculate tip
             game = Game(home_team, away_team, quotes, game_time)
@@ -279,7 +280,7 @@ class GameTipper:
 
     def _should_tip_game(self, game_time: datetime) -> bool:
         """Check if the game should be tipped based on timing."""
-        time_until_game = game_time - datetime.now()
+        time_until_game = game_time - datetime.now(ZoneInfo('Europe/Berlin'))
         logger.debug(f"Time until game: {time_until_game}")
 
         if time_until_game > Config.TIME_UNTIL_GAME:
