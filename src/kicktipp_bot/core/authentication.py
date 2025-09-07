@@ -101,6 +101,8 @@ class Authenticator:
             current_url = self.driver.current_url
             if current_url == Config.BASE_URL:
                 logger.info("Login verification successful")
+            elif current_url == 'https://www.kicktipp.de/info/profil/login':
+                self.login()
             else:
                 raise AuthenticationError(
                     f"Login failed - redirected to: {current_url}")

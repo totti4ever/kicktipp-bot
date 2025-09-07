@@ -44,4 +44,6 @@ class QuoteExtractorKicktipp:
             logger.warning(f"Could not convert quotes to float: {quotes} ({e})")
             return None
 
-        return QuoteDTO(home=home, draw=draw, away=away, raw_text=quotes_text)
+        from ..models.game_odds_dtos import GameOddsDTO, H2hDto
+        h2h = H2hDto(winHomeOdd=home, winAwayOdd=away, drawOdd=draw)
+        return GameOddsDTO(h2h=h2h, provider="Kicktipp")

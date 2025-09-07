@@ -38,10 +38,8 @@ class Game:
             Tuple of (home_goals, away_goals) prediction
         """
         # Default: nutze h2h-odds
-        if home_quote is None and self.odds and self.odds.h2h:
-            home_quote = self.odds.h2h.winHomeOdd
-        if away_quote is None and self.odds and self.odds.h2h:
-            away_quote = self.odds.h2h.winAwayOdd
+        home_quote = self.odds.h2h.winHomeOdd
+        away_quote = self.odds.h2h.winAwayOdd
 
         # Calculate quote difference (negative = home team more likely to win)
         quote_difference = home_quote - away_quote

@@ -42,14 +42,16 @@ class Config:
     ODDS_PROVIDER: str = os.getenv("ODDS_PROVIDER", "kicktipp.de")
     # API Key für the-odds-api.com (Pflicht, wenn ODDS_PROVIDER='the-odds-api.com')
     THE_ODDS_API_KEY: Optional[str] = os.getenv("THE_ODDS_API_KEY")
-    # Validierung für Odds-API-Key
-    if ODDS_PROVIDER == "the-odds-api.com" and not THE_ODDS_API_KEY:
-        raise ValueError("THE_ODDS_API_KEY muss gesetzt sein, wenn ODDS_PROVIDER='the-odds-api.com'!")
+    # Optional: Pfad für Odds-Cache (wenn gesetzt, wird persistiert und gelesen)
+    ODDS_CACHE_PERSIST_TO: Optional[str] = os.getenv("ODDS_CACHE_PERSIST_TO", "").strip() or None
+
 
     @classmethod
     def validate_required_config(cls) -> bool:
         """Validate that all required configuration is present."""
         required_vars = [cls.EMAIL, cls.PASSWORD, cls.NAME_OF_COMPETITION]
+        if cls.ODDS_PROVIDER == "the-odds-api.com":
+            required_vars.append(cls.THE_ODDS_API_KEY)
         return all(var is not None for var in required_vars)
 
     @classmethod

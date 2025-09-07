@@ -12,6 +12,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 
+from kicktipp_bot.core.quote_extractor_oddsapi import QuoteExtractorOddsApi
+
 from ..config import Config
 from ..models.game import Game
 from .notifications import NotificationManager
@@ -70,6 +72,8 @@ class GameTipper:
             logger.info(f"Found {games_count} games to process")
 
             # Process games using sequential row processing approach
+            if Config.ODDS_PROVIDER == "the-odds-api.com":
+                QuoteExtractorOddsApi.init()
             self._reset_state()
             self._process_all_table_rows()
 
@@ -239,17 +243,23 @@ class GameTipper:
                 return False
 
             # Extract quotes using the new extractor (returns QuoteDTO)
-            quotes = QuoteExtractorKicktipp.extract_quotes(data_row)
+            if Config.ODDS_PROVIDER == "the-odds-api.com":
+                quotes, quotes_detailed = QuoteExtractorOddsApi.extract_quotes(home_team, away_team, game_time)
+            else:   # Extract quotes from Kicktipp
+                quotes = QuoteExtractorKicktipp.extract_quotes(data_row)
+                quotes_detailed = None
+
             if not quotes:
                 logger.warning(
                     f"Could not extract quotes for game {game_number}")
                 return False
 
-            logger.debug(f"Quotes: home={quotes.home}, draw={quotes.draw}, away={quotes.away}, raw='{quotes.raw_text}'")
+            logger.debug(f"Quotes: home={quotes.h2h.winHomeOdd}, draw={quotes.h2h.drawOdd}, away={quotes.h2h.winAwayOdd}'")
 
             # Create game and calculate tip
-            game = Game(home_team, away_team, quotes, game_time)
+            game = Game(home_team, away_team, quotes, game_time, quotes_detailed)
             tip = game.calculate_tip()
+            #TODO: neue Berechnunglogik einführen
             logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications
