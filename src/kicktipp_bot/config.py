@@ -42,7 +42,9 @@ class Config:
     ODDS_PROVIDER: str = os.getenv("ODDS_PROVIDER", "kicktipp.de")
     # API Key für the-odds-api.com (Pflicht, wenn ODDS_PROVIDER='the-odds-api.com')
     THE_ODDS_API_KEY: Optional[str] = os.getenv("THE_ODDS_API_KEY")
-    # Optional: Pfad für Odds-Cache (wenn gesetzt, wird persistiert und gelesen)
+    ODDS_STRATEGY = os.getenv("ODDS_STRATEGY", "simple")
+    
+    # only debugging --> Optional: Pfad für Odds-Cache (wenn gesetzt, wird persistiert und gelesen)
     ODDS_CACHE_PERSIST_TO: Optional[str] = os.getenv("ODDS_CACHE_PERSIST_TO", "").strip() or None
 
 

@@ -13,9 +13,11 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 
 from kicktipp_bot.core.quote_extractor_oddsapi import QuoteExtractorOddsApi
+from kicktipp_bot.models.tip_calculator_simple import TipCalculatorSimple
+from kicktipp_bot.models.tip_calculator_advanced import TipCalculatorAdvanced
 
 from ..config import Config
-from ..models.game import Game
+from ..models.game import GameDTO
 from .notifications import NotificationManager
 from ..utils.selenium_utils import SeleniumUtils
 from .table_processors import TimeExtractor, TableRowProcessor, GameDataExtractor
@@ -81,6 +83,7 @@ class GameTipper:
             if self.processed_count > 0:
                 self._submit_all_tips()
 
+            sleep(1)
             # Debug mode sleep
             if self._is_debug_mode() and Config.RUN_EVERY_X_MINUTES != 0:
                 logger.info(
@@ -257,9 +260,11 @@ class GameTipper:
             logger.debug(f"Quotes: home={quotes.h2h.winHomeOdd}, draw={quotes.h2h.drawOdd}, away={quotes.h2h.winAwayOdd}'")
 
             # Create game and calculate tip
-            game = Game(home_team, away_team, quotes, game_time, quotes_detailed)
-            tip = game.calculate_tip()
-            #TODO: neue Berechnunglogik einführen
+            game = GameDTO(home_team, away_team, quotes, game_time, quotes_detailed)
+            if Config.ODDS_STRATEGY == "advanced" and quotes.spread is not None and quotes.totals is not None:
+                tip = TipCalculatorAdvanced.calculate_tip(game)
+            else:
+                tip = TipCalculatorSimple.calculate_tip(game)
             logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications
@@ -365,6 +370,26 @@ class GameTipper:
             except Exception as e:
                 logger.error(f"Both regular and JavaScript clicks failed: {e}")
                 raise GameTippingError("Failed to submit tips form")
+
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        # from selenium.webdriver.common.by import By
+        try:
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR,
+                    "div.messagebox.success, div.messagebox.warning"
+                ))
+            )
+            try:
+                messagebox = self.driver.find_element(By.CSS_SELECTOR, "div.messagebox.success, div.messagebox.warning")
+                message = messagebox.get_attribute("innerHTML").replace('<p>', '').replace('</p>', '').strip()
+                logger.info(f"Confirmation message: {message}")
+            except Exception as e:
+                logger.warning(f"Could not read messagebox after submit: {e}")
+            return True
+        except Exception:
+            return False
 
     def _is_debug_mode(self) -> bool:
         """Check if running in debug mode."""

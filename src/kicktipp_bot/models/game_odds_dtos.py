@@ -1,6 +1,11 @@
 from typing import Optional
 
 class GameOddsDTO:
+
+    h2h=None
+    spread=None
+    totals=None
+
     def __init__(self, h2h: Optional["H2hDto"] = None, spread: Optional["SpreadsDto"] = None, totals: Optional["TotalsDto"] = None, provider: Optional[str] = None):
         self.h2h = h2h
         self.spread = spread

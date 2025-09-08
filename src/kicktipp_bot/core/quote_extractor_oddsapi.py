@@ -40,10 +40,15 @@ class QuoteExtractorOddsApi: # Kicktipp : OddsAPI
 
     @classmethod
     def _map_teamname_KicktippToOddsapi(cls, kicktipp_name: str) -> str:
-        return cls.KICKTIPP_TO_ODDSAPI[kicktipp_name]  # KeyError, wenn nicht vorhanden
+        oddsapi_name = cls.KICKTIPP_TO_ODDSAPI.get(kicktipp_name)
+        # logger.debug(f"Mapping Kicktipp team name to OddsAPI: {kicktipp_name} --> {oddsapi_name}")
+        return oddsapi_name  # KeyError, wenn nicht vorhanden
+
     @classmethod
     def _map_teamname_OddsapiToKicktipp(cls, oddsapi_name: str) -> str:
-        return cls.ODDSAPI_TO_KICKTIPP[oddsapi_name]  # KeyError, wenn nicht vorhanden
+        kicktipp_name = cls.ODDSAPI_TO_KICKTIPP.get(oddsapi_name)
+        # logger.debug(f"Mapping OddsAPI team name to Kicktipp: {oddsapi_name} --> {kicktipp_name}")
+        return kicktipp_name  # KeyError, wenn nicht vorhanden
 
     @classmethod
     def _parse_odds_cache(cls, odds_cache: Any) -> dict:
@@ -189,9 +194,9 @@ class QuoteExtractorOddsApi: # Kicktipp : OddsAPI
                         for outcome in outcomes:
                             if outcome.get('point') is not None:
                                 handycap = outcome.get('point')
-                            if outcome.get('name') == favourite_team:
+                            if cls._map_teamname_OddsapiToKicktipp(outcome.get('name')) == favourite_team:
                                 winFavouriteOdd = outcome.get('price')
-                            elif outcome.get('name') == underdog_team:
+                            elif cls._map_teamname_OddsapiToKicktipp(outcome.get('name')) == underdog_team:
                                 winUnderdogOdd = outcome.get('price')
                         if handycap is not None and winFavouriteOdd is not None and winUnderdogOdd is not None:
                             spread = SpreadsDto(handycap, winFavouriteOdd, winUnderdogOdd)

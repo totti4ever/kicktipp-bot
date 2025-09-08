@@ -7,7 +7,7 @@ for the Kicktipp platform.
 
 # Import main classes for easy access
 from .config import Config
-from .models.game import Game
+from .models.game import GameDTO
 
 # Import core functionality
 from .core.authentication import Authenticator, AuthenticationError
@@ -20,7 +20,7 @@ from .webdriver.webdriver_manager import WebDriverManager
 
 __all__ = [
     "Config",
-    "Game",
+    "GameDTO",
     "Authenticator",
     "AuthenticationError",
     "GameTipper",
