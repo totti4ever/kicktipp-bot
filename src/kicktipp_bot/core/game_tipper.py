@@ -17,7 +17,7 @@ from kicktipp_bot.models.tip_calculator_simple import TipCalculatorSimple
 from kicktipp_bot.models.tip_calculator_advanced import TipCalculatorAdvanced
 
 from ..config import Config
-from ..models.game import GameDTO
+from ..models.game_dto import GameDTO
 from .notifications import NotificationManager
 from ..utils.selenium_utils import SeleniumUtils
 from .table_processors import TimeExtractor, TableRowProcessor, GameDataExtractor
@@ -81,7 +81,9 @@ class GameTipper:
 
             # Submit all tips (button should always be clickable)
             if self.processed_count > 0:
-                self._submit_all_tips()
+                if self._submit_all_tips():
+                    # Persistiere die Tipps
+                    self._persist_tips() #TODO: implement persistence logic
 
             sleep(1)
             # Debug mode sleep
@@ -265,6 +267,14 @@ class GameTipper:
                 tip = TipCalculatorAdvanced.calculate_tip(game)
             else:
                 tip = TipCalculatorSimple.calculate_tip(game)
+
+            '''
+            TODO: persistiere
+            1. GameDTO anreichern um Tipp
+            2. Array mit GameDTOs erstellen/erweitern/befüllen
+            3. Tipps persistieren (z.B. in einer Datenbank oder Datei) --> aber das dann das andere TODO in #86
+            '''
+
             logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications

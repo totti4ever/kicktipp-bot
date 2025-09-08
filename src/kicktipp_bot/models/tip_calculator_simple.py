@@ -1,6 +1,6 @@
 import random
 from typing import Tuple
-from kicktipp_bot.models.game import GameDTO
+from kicktipp_bot.models.game_dto import GameDTO
 
 class TipCalculatorSimple:
 	"""Simple tip calculation strategy based on h2h odds."""

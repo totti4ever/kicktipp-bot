@@ -1,6 +1,6 @@
 import math
 from typing import Tuple
-from kicktipp_bot.models.game import GameDTO
+from kicktipp_bot.models.game_dto import GameDTO
 
 class TipCalculatorAdvanced:
     """Advanced tip calculation strategy based on h2h, spread and totals odds."""
@@ -32,11 +32,6 @@ class TipCalculatorAdvanced:
             totals_total = game_dto.odds.totals.total
             totals_overOdd = TipCalculatorAdvanced.round_half_up(game_dto.odds.totals.overOdd, 2)
             totals_underOdd = TipCalculatorAdvanced.round_half_up(game_dto.odds.totals.underOdd, 2)
-
-        '''
-        TODO: Implement advanced tip calculation logic
-        Tore Abstand = spread = Tore für Favoriten
-        '''
 
         handycap = TipCalculatorAdvanced.round_half_up(spread_handycap)
         favGoals = underdogGoals = 0

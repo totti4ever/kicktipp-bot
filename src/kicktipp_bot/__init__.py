@@ -7,7 +7,7 @@ for the Kicktipp platform.
 
 # Import main classes for easy access
 from .config import Config
-from .models.game import GameDTO
+from .models.game_dto import GameDTO
 
 # Import core functionality
 from .core.authentication import Authenticator, AuthenticationError
