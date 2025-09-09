@@ -116,11 +116,13 @@ def main() -> None:
 
     # Check for debug mode
     debug_mode = len(sys.argv) > 1 and '--debug' in sys.argv
+
     # Setup logging with appropriate level
     setup_logging(debug_mode)
     # Get logger after setup
 
     logger = logging.getLogger(__name__)
+
     if debug_mode:
         logger.info("Debug mode enabled - detailed logging active")
 
@@ -177,13 +179,14 @@ def main() -> None:
     health_monitor.start_health_server()
     health_status.heartbeat()
 
-
+    # Mark as ready once everything is initialized
+    health_status.mark_ready()
+    logger.info("Bot is fully initialized and ready")
 
     try:
         while True:
             try:
-                current_time = datetime.now().strftime('%d.%m.%y %H:%M')
-                logger.info(f"{current_time}: Starting tipping cycle")
+                logger.info("Starting tipping cycle")
 
                 # Update heartbeat
                 health_status.heartbeat()
@@ -209,10 +212,9 @@ def main() -> None:
                 return
             next_run = datetime.now().timestamp() + sleep_minutes * 60
             logger.info(
-                f"Sleeping for {sleep_minutes} minutes until next cycle at {next_run}")
+                f"Sleeping for {sleep_minutes} minutes until next cycle at {datetime.fromtimestamp(next_run).strftime('%d.%m.%y %H:%M:%S')}")
             while (remaining := next_run - datetime.now().timestamp()) > 0:
                 sleep(min(10, remaining))
-
 
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
