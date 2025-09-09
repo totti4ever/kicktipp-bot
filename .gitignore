@@ -1,6 +1,5 @@
 # dev files for this project
-odds_cache.json
-
+/data/
 # Ignore IDE files and Mac files
 .DS_Store
 .idea/

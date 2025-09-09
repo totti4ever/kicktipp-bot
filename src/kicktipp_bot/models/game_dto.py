@@ -80,3 +80,33 @@ class GameDTO:
         """Detailed string representation for debugging."""
         return (f"GameDTO(home='{self.home_team}', away='{self.away_team}', "
                 f"game_time='{self.game_time}', odds={self.odds}, detailed_odds={self.detailed_odds})")
+
+    def to_dict(self):
+        """
+        Convert the GameDTO to a JSON-serializable dict, including odds and prediction.
+        """
+        def odds_to_dict(odds):
+            if hasattr(odds, '__dict__'):
+                d = dict(odds.__dict__)
+                # Recursively convert nested odds objects
+                for k, v in d.items():
+                    if hasattr(v, '__dict__'):
+                        d[k] = dict(v.__dict__)
+                return d
+            return str(odds)
+
+        result = {
+            "home_team": self.home_team,
+            "away_team": self.away_team,
+            "game_time": self.game_time.isoformat() if self.game_time else None,
+            "odds": odds_to_dict(self.odds),
+            "detailed_odds": [odds_to_dict(o) for o in getattr(self, "detailed_odds", [])],
+            "actual_home_goals": self.actual_home_goals,
+            "actual_away_goals": self.actual_away_goals,
+        }
+        if self.prediction:
+            (res, ts) = self.prediction
+            result["predicted_home_goals"] = res[0]
+            result["predicted_away_goals"] = res[1]
+            result["prediction_time"] = ts.isoformat()
+        return result

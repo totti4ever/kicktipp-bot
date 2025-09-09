@@ -46,6 +46,8 @@ class Config:
     
     # only debugging --> Optional: Pfad für Odds-Cache (wenn gesetzt, wird persistiert und gelesen)
     ODDS_CACHE_PERSIST_TO: Optional[str] = os.getenv("ODDS_CACHE_PERSIST_TO", "").strip() or None
+    # Path to persist tips history
+    TIPPS_PERSIST_TO: Optional[str] = os.getenv("TIPPS_PERSIST_TO", "").strip() or None
 
 
     @classmethod

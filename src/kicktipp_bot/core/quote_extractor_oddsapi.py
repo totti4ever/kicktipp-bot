@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import json
+from pathlib import Path
 import requests
 from typing import Optional, Any
 
@@ -102,6 +103,7 @@ class QuoteExtractorOddsApi: # Kicktipp : OddsAPI
             cache_path = os.path.join(project_root, cache_path)
         if cache_path:
             try:
+                Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
                 with open(cache_path, 'w', encoding='utf-8') as f:
                     json.dump(odds, f, ensure_ascii=False, indent=2)
                 logger.info(f"Odds persisted to cache file: {cache_path}")

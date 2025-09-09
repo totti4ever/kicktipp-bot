@@ -1,8 +1,11 @@
 """Game tipping module for handling the core betting logic."""
 
 import logging
+import os
 import re
 import sys
+import json
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
@@ -42,6 +45,7 @@ class GameTipper:
         self.last_seen_time = None
         self.processed_count = 0
         self.game_number = 0
+        self.tipped_games = []  # List[GameDTO] for persistence
 
     def tip_all_games(self) -> None:
         """Process and tip all available games."""
@@ -81,9 +85,9 @@ class GameTipper:
 
             # Submit all tips (button should always be clickable)
             if self.processed_count > 0:
-                if self._submit_all_tips():
+                if self._submit_all_tips() and Config.TIPPS_PERSIST_TO:
                     # Persistiere die Tipps
-                    self._persist_tips() #TODO: implement persistence logic
+                    self._persist_tips(Path(Config.TIPPS_PERSIST_TO))
 
             sleep(1)
             # Debug mode sleep
@@ -268,13 +272,9 @@ class GameTipper:
             else:
                 tip = TipCalculatorSimple.calculate_tip(game)
 
-            '''
-            TODO: persistiere
-            1. GameDTO anreichern um Tipp
-            2. Array mit GameDTOs erstellen/erweitern/befüllen
-            3. Tipps persistieren (z.B. in einer Datenbank oder Datei) --> aber das dann das andere TODO in #86
-            '''
-
+            # Enrich GameDTO with prediction (tip and timestamp)
+            game.prediction = tip  # property handles timestamp
+            self.tipped_games.append(game)
             logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications
@@ -448,3 +448,34 @@ class GameTipper:
                     pass
         else:
             logger.debug("No terms dialog found - may already be accepted")
+
+    def _persist_tips(self, path=Path):
+        """Persist all tipped games to the configured JSON file."""
+        # Use GameDTO.to_dict for serialization
+        # path = Path(Config.TIPPS_PERSIST_TO)
+        if not path:
+            raise ValueError("Invalid tips persistence path")
+        if not os.path.isabs(path):
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            path = os.path.join(project_root, path)
+            path=Path(path)
+
+        # Load existing tips if file exists
+        tips = []
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    tips = json.load(f)
+            except Exception:
+                tips = []
+        # Append new tip set as a session with timestamp
+        if self.tipped_games:
+            session = {
+                "timestamp": datetime.now().isoformat(),
+                "tips": [g.to_dict() for g in self.tipped_games]
+            }
+            tips.append(session)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(tips, f, ensure_ascii=False, indent=2)
+        logger.info(f"Persisted {len(self.tipped_games)} tips as session to {path}")
