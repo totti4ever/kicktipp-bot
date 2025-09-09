@@ -1,7 +1,7 @@
 """Model classes for Kicktipp Bot."""
 
-from .game import Game
+from .game_dto import GameDTO
 
 __all__ = [
-    "Game",
+    "GameDTO",
 ]

@@ -1,8 +1,11 @@
 """Game tipping module for handling the core betting logic."""
 
 import logging
+import os
 import re
 import sys
+import json
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
@@ -12,11 +15,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 
+from kicktipp_bot.core.quote_extractor_oddsapi import QuoteExtractorOddsApi
+from kicktipp_bot.models.tip_calculator_simple import TipCalculatorSimple
+from kicktipp_bot.models.tip_calculator_advanced import TipCalculatorAdvanced
+
 from ..config import Config
-from ..models.game import Game
+from ..models.game_dto import GameDTO
 from .notifications import NotificationManager
 from ..utils.selenium_utils import SeleniumUtils
 from .table_processors import TimeExtractor, TableRowProcessor, GameDataExtractor
+from .quote_extractor_kicktipp import QuoteExtractorKicktipp
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,7 @@ class GameTipper:
         self.last_seen_time = None
         self.processed_count = 0
         self.game_number = 0
+        self.tipped_games = []  # List[GameDTO] for persistence
 
     def tip_all_games(self) -> None:
         """Process and tip all available games."""
@@ -69,12 +78,18 @@ class GameTipper:
             logger.info(f"Found {games_count} games to process")
 
             # Process games using sequential row processing approach
+            if Config.ODDS_PROVIDER == "the-odds-api.com":
+                QuoteExtractorOddsApi.init()
             self._reset_state()
             self._process_all_table_rows()
 
             # Submit all tips (button should always be clickable)
-            self._submit_all_tips()
+            if self.processed_count > 0:
+                if self._submit_all_tips() and Config.TIPPS_PERSIST_TO:
+                    # Persistiere die Tipps
+                    self._persist_tips(Path(Config.TIPPS_PERSIST_TO))
 
+            sleep(1)
             # Debug mode sleep
             if self._is_debug_mode() and Config.RUN_EVERY_X_MINUTES != 0:
                 logger.info(
@@ -208,10 +223,10 @@ class GameTipper:
                 f"Processing: {home_team} vs {away_team} | Time: {game_time.strftime('%d.%m.%y %H:%M')}")
 
 
-            # Prüfe, ob das Spiel bereits begonnen hat (Zeitzonen-sicher, zoneinfo)
+            # Check if the game has already started (timezone-safe, zoneinfo)  
             now_berlin = datetime.now(ZoneInfo('Europe/Berlin'))
             if game_time <= now_berlin:
-                logger.info(f"Game {game_number} has already started ({game_time.strftime('%d.%m.%y %H:%M %Z')}). Skipping...")
+                logger.info(f"Game {game_number} has already started ({game_time.strftime('%d.%m.%y %H:%M %z')}). Skipping...")
                 return False
 
             # Get tip fields using the new extractor
@@ -236,18 +251,30 @@ class GameTipper:
             if not self._should_tip_game(game_time):
                 return False
 
-            # Extract quotes using the new extractor
-            quotes = GameDataExtractor.extract_quotes(data_row)
+            # Extract quotes using the new extractor (returns QuoteDTO)
+            if Config.ODDS_PROVIDER == "the-odds-api.com":
+                quotes, quotes_detailed = QuoteExtractorOddsApi.extract_quotes(home_team, away_team, game_time)
+            else:   # Extract quotes from Kicktipp
+                quotes = QuoteExtractorKicktipp.extract_quotes(data_row)
+                quotes_detailed = None
+
             if not quotes:
                 logger.warning(
                     f"Could not extract quotes for game {game_number}")
                 return False
 
-            logger.debug(f"Quotes: {quotes}")
+            logger.debug(f"Quotes: home={quotes.h2h.winHomeOdd}, draw={quotes.h2h.drawOdd}, away={quotes.h2h.winAwayOdd}'")
 
             # Create game and calculate tip
-            game = Game(home_team, away_team, quotes, game_time)
-            tip = game.calculate_tip()
+            game = GameDTO(home_team, away_team, quotes, game_time, quotes_detailed)
+            if Config.ODDS_STRATEGY == "advanced" and quotes.spread is not None and quotes.totals is not None:
+                tip = TipCalculatorAdvanced.calculate_tip(game)
+            else:
+                tip = TipCalculatorSimple.calculate_tip(game)
+
+            # Enrich GameDTO with prediction (tip and timestamp)
+            game.prediction = tip  # property handles timestamp
+            self.tipped_games.append(game)
             logger.info(f"Calculated tip: {tip[0]} - {tip[1]}")
 
             # Enter tip and send notifications
@@ -278,7 +305,7 @@ class GameTipper:
 
     def _should_tip_game(self, game_time: datetime) -> bool:
         """Check if the game should be tipped based on timing."""
-        time_until_game = game_time - datetime.now()
+        time_until_game = game_time - datetime.now(ZoneInfo('Europe/Berlin'))
         logger.debug(f"Time until game: {time_until_game}")
 
         if time_until_game > Config.TIME_UNTIL_GAME:
@@ -354,6 +381,26 @@ class GameTipper:
                 logger.error(f"Both regular and JavaScript clicks failed: {e}")
                 raise GameTippingError("Failed to submit tips form")
 
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        # from selenium.webdriver.common.by import By
+        try:
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR,
+                    "div.messagebox.success, div.messagebox.warning"
+                ))
+            )
+            try:
+                messagebox = self.driver.find_element(By.CSS_SELECTOR, "div.messagebox.success, div.messagebox.warning")
+                message = messagebox.get_attribute("innerHTML").replace('<p>', '').replace('</p>', '').strip()
+                logger.info(f"Confirmation message: {message}")
+            except Exception as e:
+                logger.warning(f"Could not read messagebox after submit: {e}")
+            return True
+        except Exception:
+            return False
+
     def _is_debug_mode(self) -> bool:
         """Check if running in debug mode."""
         try:
@@ -401,3 +448,34 @@ class GameTipper:
                     pass
         else:
             logger.debug("No terms dialog found - may already be accepted")
+
+    def _persist_tips(self, path=Path):
+        """Persist all tipped games to the configured JSON file."""
+        # Use GameDTO.to_dict for serialization
+        # path = Path(Config.TIPPS_PERSIST_TO)
+        if not path:
+            raise ValueError("Invalid tips persistence path")
+        if not os.path.isabs(path):
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            path = os.path.join(project_root, path)
+            path=Path(path)
+
+        # Load existing tips if file exists
+        tips = []
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    tips = json.load(f)
+            except Exception:
+                tips = []
+        # Append new tip set as a session with timestamp
+        if self.tipped_games:
+            session = {
+                "timestamp": datetime.now().isoformat(),
+                "tips": [g.to_dict() for g in self.tipped_games]
+            }
+            tips.append(session)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(tips, f, ensure_ascii=False, indent=2)
+        logger.info(f"Persisted {len(self.tipped_games)} tips as session to {path}")

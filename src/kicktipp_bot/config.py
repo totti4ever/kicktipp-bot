@@ -38,10 +38,24 @@ class Config:
     NTFY_PASSWORD: Optional[str] = os.getenv("NTFY_PASSWORD")
     WEBHOOK_URL: Optional[str] = os.getenv("WEBHOOK_URL")
 
+    # Odds provider ("kicktipp.de" (default) or "the-odds-api.com")
+    ODDS_PROVIDER: str = os.getenv("ODDS_PROVIDER", "kicktipp.de")
+    # API Key für the-odds-api.com (Pflicht, wenn ODDS_PROVIDER='the-odds-api.com')
+    THE_ODDS_API_KEY: Optional[str] = os.getenv("THE_ODDS_API_KEY")
+    ODDS_STRATEGY = os.getenv("ODDS_STRATEGY", "simple")
+    
+    # only debugging --> Optional: Pfad für Odds-Cache (wenn gesetzt, wird persistiert und gelesen)
+    ODDS_CACHE_PERSIST_TO: Optional[str] = os.getenv("ODDS_CACHE_PERSIST_TO", "").strip() or None
+    # Path to persist tips history
+    TIPPS_PERSIST_TO: Optional[str] = os.getenv("TIPPS_PERSIST_TO", "").strip() or None
+
+
     @classmethod
     def validate_required_config(cls) -> bool:
         """Validate that all required configuration is present."""
         required_vars = [cls.EMAIL, cls.PASSWORD, cls.NAME_OF_COMPETITION]
+        if cls.ODDS_PROVIDER == "the-odds-api.com":
+            required_vars.append(cls.THE_ODDS_API_KEY)
         return all(var is not None for var in required_vars)
 
     @classmethod

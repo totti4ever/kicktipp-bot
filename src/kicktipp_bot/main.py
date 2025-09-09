@@ -113,16 +113,18 @@ def run_bot() -> None:
 
 def main() -> None:
     """Main entry point for the Kicktipp bot."""
+
     # Check for debug mode
     debug_mode = len(sys.argv) > 1 and '--debug' in sys.argv
-    if debug_mode:
-        logger.info("Debug mode enabled - detailed logging active")
 
     # Setup logging with appropriate level
     setup_logging(debug_mode)
-
     # Get logger after setup
+
     logger = logging.getLogger(__name__)
+
+    if debug_mode:
+        logger.info("Debug mode enabled - detailed logging active")
 
     # Validate configuration
     if not Config.validate_required_config():
@@ -130,10 +132,37 @@ def main() -> None:
                      "KICKTIPP_PASSWORD and KICKTIPP_NAME_OF_COMPETITION environment variables")
         sys.exit(1)
 
+
     logger.info("Kicktipp Bot starting...")
-    logger.info(f"Configuration: Competition={Config.NAME_OF_COMPETITION}, "
-                f"Run interval={Config.RUN_EVERY_X_MINUTES}min, "
-                f"Tip threshold={Config.TIME_UNTIL_GAME}")
+
+    # Log current configuration
+    logger.info("--- Aktuelle Konfiguration ---")
+    logger.info(f"Competition: {Config.NAME_OF_COMPETITION}")
+    logger.info(f"Run interval: {Config.RUN_EVERY_X_MINUTES} min")
+    # Output tip threshold as days, hours, and minutes (only non-zero units)
+    td = Config.TIME_UNTIL_GAME
+    days = td.days
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes = remainder // 60
+    threshold_parts = []
+    if days:
+        threshold_parts.append(f"{days}d")
+    if hours:
+        threshold_parts.append(f"{hours}h")
+    if minutes:
+        threshold_parts.append(f"{minutes}min")
+    threshold_str = " ".join(threshold_parts) if threshold_parts else "0min"
+    logger.info(f"Tip threshold: {threshold_str}")
+    logger.info(f"Overwrite Tips: {getattr(Config, 'OVERWRITE_TIPS', None)}")
+    odds_provider = getattr(Config, 'ODDS_PROVIDER', None)
+    logger.info(f"Odds Provider: {odds_provider}")
+    if odds_provider and odds_provider.lower() == 'the-odds-api.com':
+        logger.info(f"Odds API Key set: {'YES' if getattr(Config, 'THE_ODDS_API_KEY', None) else 'NO'}")
+        logger.info(f"Odds Cache Persist To: {getattr(Config, 'ODDS_CACHE_PERSIST_TO', None)}")
+    sentry_dsn = os.getenv('SENTRY_DSN')
+    if sentry_dsn:
+        logger.info(f"Sentry DSN set: {sentry_dsn}")
+    logger.info("-----------------------------")
 
     if os.getenv("SENTRY_DSN"):
         sentry_sdk.init(
@@ -150,11 +179,14 @@ def main() -> None:
     health_monitor.start_health_server()
     health_status.heartbeat()
 
+    # Mark as ready once everything is initialized
+    health_status.mark_ready()
+    logger.info("Bot is fully initialized and ready")
+
     try:
         while True:
             try:
-                current_time = datetime.now().strftime('%d.%m.%y %H:%M')
-                logger.info(f"{current_time}: Starting tipping cycle")
+                logger.info("Starting tipping cycle")
 
                 # Update heartbeat
                 health_status.heartbeat()
@@ -180,10 +212,9 @@ def main() -> None:
                 return
             next_run = datetime.now().timestamp() + sleep_minutes * 60
             logger.info(
-                f"Sleeping for {sleep_minutes} minutes until next cycle at {next_run}")
+                f"Sleeping for {sleep_minutes} minutes until next cycle at {datetime.fromtimestamp(next_run).strftime('%d.%m.%y %H:%M:%S')}")
             while (remaining := next_run - datetime.now().timestamp()) > 0:
                 sleep(min(10, remaining))
-
 
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")

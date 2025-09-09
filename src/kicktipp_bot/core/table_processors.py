@@ -79,7 +79,7 @@ class TimeExtractor:
             return fallback_time
         else:
             logger.warning("No time available, using current time")
-            return datetime.now()
+            return datetime.now(tz=ZoneInfo('Europe/Berlin'))
 
     @staticmethod
     def has_visible_time(data_row) -> bool:
@@ -185,33 +185,4 @@ class GameDataExtractor:
                         f"Game is over or not available: {result_text}")
             return None
 
-    @staticmethod
-    def extract_quotes(game_row) -> Optional[list]:
-        """Extract betting quotes directly from a game row element."""
-        quotes_element = SeleniumUtils.safe_find_element(
-            game_row, By.XPATH, './/a[contains(@class, "quote-link")]')
-        if not quotes_element:
-            logger.warning("Could not find quotes element")
-            return None
-
-        quotes_raw = SeleniumUtils.safe_get_text(
-            quotes_element, 'quotes element')
-        if not quotes_raw:
-            logger.warning("Could not extract quotes content")
-            return None
-
-        quotes_text = quotes_raw.replace("Quote: ", "").strip()
-
-        if " / " in quotes_text:
-            quotes = quotes_text.split(" / ")
-        elif " | " in quotes_text:
-            quotes = quotes_text.split(" | ")
-        else:
-            logger.warning(f"Could not parse quotes format: {quotes_text}")
-            return None
-
-        if len(quotes) != 3:
-            logger.warning(f"Expected 3 quotes, got {len(quotes)}: {quotes}")
-            return None
-
-        return quotes
+    # extract_quotes wurde ausgelagert (siehe quote_extractor_kicktipp.py)
